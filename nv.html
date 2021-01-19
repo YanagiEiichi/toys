@@ -1,0 +1,132 @@
+<meta charset="utf-8" />
+<style>
+@page {
+  size: A4;
+  margin: 0;
+}
+body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 210mm;
+  margin: auto;
+  box-shadow: 0 0 10px #ccc;
+  padding: 2em;
+  color: #24292e;
+  box-sizing: border-box;
+}
+body > div {
+  margin: -2em;
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.0.0/dist/echarts.min.js"></script>
+<script>
+const url = new URL('https://voice.baidu.com/newpneumonia/getv2');
+url.searchParams.append('target', 'trend');
+url.searchParams.append('isCaseIn', '0');
+url.searchParams.append('from', 'mola-virus');
+url.searchParams.append('area', '美国');
+url.searchParams.append('stage', 'publish');
+url.searchParams.append('callback', 'callback');
+
+const createEma = (N, values) => {
+  const res = [ values[0] ];
+  for (let i = 1; i < values.length; i++) {
+    res[i] = (2 * values[i] + (N - 1) * res[i - 1]) / (N + 1);
+  }
+  return res;
+};
+
+function callback(res) {
+  const [ { trend } ] = res.data;
+  const values = trend.list.find(i => i.name === '新增确诊').data;
+  const { updateDate } = trend;
+
+  for (let i = 0; i < updateDate.length; i++) {
+    updateDate[i] = updateDate[i].replace('.', '/');
+  }
+
+  {
+    const div = document.createElement('h1');
+    div.textContent = '美国新增确诊';
+    div.style.position = 'absolute';
+    div.style.left = '2em';
+    div.style.top = 60;
+    div.style.opacity = .8;
+    document.body.appendChild(div);
+  }
+
+  {
+    const div = document.createElement('div');
+    div.style.height = 400;
+    document.body.appendChild(div);
+    const chart = echarts.init(div);
+    const ema14 = createEma(14, values);
+    const ema30 = createEma(30, values);
+    const ema60 = createEma(60, values);
+    chart.setOption({
+      xAxis: { data: updateDate },
+      yAxis: { show: false },
+      series: [
+        {
+          name: '新增确诊', type: 'bar', data: values,
+          itemStyle: { opacity: .3 }
+        },
+        {
+          name: 'EMA14', type: 'line', data: ema14,
+          smooth: .5, symbol: 'none',
+          lineStyle: { color: '#f1913e', width: 1 }
+        },
+        {
+          name: 'EMA30', type: 'line', data: ema30,
+          smooth: .5, symbol: 'none',
+          lineStyle: { color: '#49aee1', width: 1 }
+        },
+        {
+          name: 'EMA60', type: 'line', data: ema60,
+          smooth: .5, symbol: 'none',
+          lineStyle: { color: '#da7ad6', width: 1 }
+        }
+      ]
+    });
+  }
+
+  {
+    const div = document.createElement('div');
+    div.style.height = 200;
+    document.body.appendChild(div);
+    const chart = echarts.init(div);
+    const ema12 = createEma(12, values);
+    const ema26 = createEma(26, values);
+    const dif = values.map((_, i) => ema12[i] - ema26[i]);
+    const dea = createEma(9, dif);
+    const macd = values.map((_, i) => (dif[i] - dea[i]) * 2);
+    chart.setOption({
+      xAxis: { data: updateDate },
+      yAxis: { show: false },
+      series: [
+        {
+          name: 'MACD', type: 'bar', data: macd,
+          itemStyle: {
+            normal: { color: ({ data }) => data > 0 ? '#ec434f' : '#63c381', width: 1 }
+          }
+        },
+        {
+          name: 'DIF', type: 'line', data: dif,
+          smooth: .5, symbol: 'none',
+          lineStyle: { color: '#f1913e', width: 1 }
+        },
+        {
+          name: 'DEA', type: 'line', data: dea,
+          smooth: .5, symbol: 'none',
+          lineStyle: { color: '#49aee1', width: 1 }
+        }
+      ]
+    });
+  }
+}
+
+const script = document.createElement('script');
+script.src = url;
+document.head.appendChild(script);
+</script>

@@ -37,93 +37,130 @@ const createEma = (N, values) => {
   return res;
 };
 
+const colorMap = { EMA14: '#f1913e', EMA30: '#49aee1', EMA60: '#da7ad6' };
+
 function callback(res) {
   const [ { trend } ] = res.data;
   const values = trend.list.find(i => i.name === '新增确诊').data;
   const { updateDate } = trend;
+  const timeline = trend.updateDate.map(i => i.replace('.', '/'));
 
-  for (let i = 0; i < updateDate.length; i++) {
-    updateDate[i] = updateDate[i].replace('.', '/');
-  }
+  const mainChartContainer = document.createElement('div');
+  mainChartContainer.style.height = 400;
+  document.body.appendChild(mainChartContainer);
+  const mainChart = echarts.init(mainChartContainer);
+  const ema14 = createEma(14, values);
+  const ema30 = createEma(30, values);
+  const ema60 = createEma(60, values);
 
-  {
-    const div = document.createElement('h1');
-    div.textContent = '美国新增确诊';
-    div.style.position = 'absolute';
-    div.style.left = '2em';
-    div.style.top = 60;
-    div.style.opacity = .8;
-    document.body.appendChild(div);
-  }
+  const macdChartContainer = document.createElement('div');
+  macdChartContainer.style.height = 200;
+  document.body.appendChild(macdChartContainer);
+  const macdChart = echarts.init(macdChartContainer);
+  const ema12 = createEma(12, values);
+  const ema26 = createEma(26, values);
+  const dif = values.map((_, i) => ema12[i] - ema26[i]);
+  const dea = createEma(9, dif);
+  const macd = values.map((_, i) => (dif[i] - dea[i]) * 2);
 
-  {
-    const div = document.createElement('div');
-    div.style.height = 400;
-    document.body.appendChild(div);
-    const chart = echarts.init(div);
-    const ema14 = createEma(14, values);
-    const ema30 = createEma(30, values);
-    const ema60 = createEma(60, values);
-    chart.setOption({
-      xAxis: { data: updateDate },
+  const header = document.createElement('h1');
+  header.textContent = '美国新增确诊';
+  header.style.position = 'absolute';
+  header.style.zIndex = '1';
+  header.style.left = '2em';
+  header.style.top = 60;
+  header.style.opacity = .8;
+  document.body.appendChild(header);
+
+  const renderCharts = (start) => {
+    const xTimeline = timeline.slice(start);
+    const xValues = values.slice(start);
+    const xEma14 = ema14.slice(start);
+    const xEma30 = ema30.slice(start);
+    const xEma60 = ema60.slice(start);
+    mainChart.setOption({
+      xAxis: { data: xTimeline },
       yAxis: { show: false },
+      tooltip: {
+        trigger: 'item',
+        formatter: ({ dataIndex: i }) => `
+          <div style="display: flex; justify-content: space-between;">
+            <h4 style="margin: 0;">${xTimeline[i]}</h4>
+            <strong>${xValues[i]}</strong>
+          </div>
+          <ul style="list-style-position: inside; padding: 0; margin: 3px 0 0 0;">
+            <li style="color: ${colorMap.EMA14};">EMA14: ${xEma14[i].toFixed(0)}</li>
+            <li style="color: ${colorMap.EMA30};">EMA30: ${xEma30[i].toFixed(0)}</li>
+            <li style="color: ${colorMap.EMA60};">EMA60: ${xEma60[i].toFixed(0)}</li>
+          </ul>
+        `
+      },
       series: [
         {
-          name: '新增确诊', type: 'bar', data: values,
+          name: 'value', type: 'bar', data: xValues,
           itemStyle: { opacity: .3 }
         },
         {
-          name: 'EMA14', type: 'line', data: ema14,
+          name: 'EMA14', type: 'line', data: xEma14,
           smooth: .5, symbol: 'none',
-          lineStyle: { color: '#f1913e', width: 1 }
+          lineStyle: { color: colorMap.EMA14, width: 1 }
         },
         {
-          name: 'EMA30', type: 'line', data: ema30,
+          name: 'EMA30', type: 'line', data: xEma30,
           smooth: .5, symbol: 'none',
-          lineStyle: { color: '#49aee1', width: 1 }
+          lineStyle: { color: colorMap.EMA30, width: 1 }
         },
         {
-          name: 'EMA60', type: 'line', data: ema60,
+          name: 'EMA60', type: 'line', data: xEma60,
           smooth: .5, symbol: 'none',
-          lineStyle: { color: '#da7ad6', width: 1 }
+          lineStyle: { color: colorMap.EMA60, width: 1 }
         }
       ]
     });
-  }
-
-  {
-    const div = document.createElement('div');
-    div.style.height = 200;
-    document.body.appendChild(div);
-    const chart = echarts.init(div);
-    const ema12 = createEma(12, values);
-    const ema26 = createEma(26, values);
-    const dif = values.map((_, i) => ema12[i] - ema26[i]);
-    const dea = createEma(9, dif);
-    const macd = values.map((_, i) => (dif[i] - dea[i]) * 2);
-    chart.setOption({
-      xAxis: { data: updateDate },
+    macdChart.setOption({
+      xAxis: { data: xTimeline },
       yAxis: { show: false },
       series: [
         {
-          name: 'MACD', type: 'bar', data: macd,
+          name: 'MACD', type: 'bar', data: macd.slice(start),
           itemStyle: {
             normal: { color: ({ data }) => data > 0 ? '#ec434f' : '#63c381', width: 1 }
           }
         },
         {
-          name: 'DIF', type: 'line', data: dif,
+          name: 'DIF', type: 'line', data: dif.slice(start),
           smooth: .5, symbol: 'none',
           lineStyle: { color: '#f1913e', width: 1 }
         },
         {
-          name: 'DEA', type: 'line', data: dea,
+          name: 'DEA', type: 'line', data: dea.slice(start),
           smooth: .5, symbol: 'none',
           lineStyle: { color: '#49aee1', width: 1 }
         }
       ]
     });
+  };
+
+  const timeRangeSelector = document.createElement('select');
+  timeRangeSelector.style.marginLeft = '1em';
+  const timeRangeSelectorHandler = () => {
+    const value = timeRangeSelector.value;
+    console.log(value);
+    renderCharts(value);
+  };
+  timeRangeSelector.addEventListener('change', timeRangeSelectorHandler);
+  for (let [ textContent, value ] of [
+    [ '近 12 月', -365 ],
+    [ '近 6 月', -183 ],
+    [ '近 3 月', -91 ],
+    [ '全部', 0 ]
+  ]) {
+    const option = document.createElement('option');
+    Object.assign(option, { textContent, value });
+    timeRangeSelector.appendChild(option);
   }
+  header.appendChild(timeRangeSelector);
+  timeRangeSelectorHandler();
 }
 
 const script = document.createElement('script');

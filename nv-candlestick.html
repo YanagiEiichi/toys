@@ -1,0 +1,158 @@
+<meta charset="utf-8" />
+<link href="a4.css" rel="stylesheet" />
+<style>
+body > div {
+  margin: -2em;
+}
+header {
+  display: flex;
+  align-items: center;
+  opacity: .8;
+  position: relative;
+  z-index: 1;
+  padding-left: 1em;
+}
+header > * {
+  margin-right: 1em;
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.0.0/dist/echarts.min.js"></script>
+<script>
+const usp = new URLSearchParams(location.search);
+const area = usp.get('area') || '上海';
+
+const url = new URL('https://voice.baidu.com/newpneumonia/getv2');
+url.searchParams.append('target', 'trend');
+url.searchParams.append('isCaseIn', '0');
+url.searchParams.append('from', 'mola-virus');
+url.searchParams.append('area', area);
+url.searchParams.append('stage', 'publish');
+url.searchParams.append('callback', 'callback');
+
+const START = Date.UTC(2020, 0, 5);
+
+const buildGroups = (values, categories) => {
+  let year = 2020;
+  let month;
+  const groups = [];
+  categories.map(i => i.split('.')).map(([ m, d ], i) => {
+    if (m < month) year++;
+    month = +m;
+    const time = Date.UTC(year, m - 1, d);
+    const u = Math.floor(((time - START) / 864E5) / 7);
+    if (!groups[u]) groups[u] = [];
+    groups[u].push(values[i]); // { v: values[i], d: new Date(time) });
+  });
+  return groups;
+};
+
+function callback(res) {
+  const [ { trend } ] = res.data;
+  const { 确诊, 治愈, 死亡 } = Object.fromEntries(trend.list.map(i => [ i.name, i.data ]));
+  const { updateDate } = trend;
+
+  const values = 确诊.map((v, i) => v - 治愈[i] - 死亡[i]);
+  const groups = buildGroups(values, updateDate);
+  const timeline = Object.keys(groups).map(v => {
+    v *= 1;
+    const t = new Date(START + v * 864E5 * 7);
+    const e = new Date(START + (v + 1) * 864E5 * 7 - 1);
+    t.toString = () => t.getUTCMonth() + 1 + '/' + t.getUTCDate();
+    t.toFullString = () => {
+      const a = [ t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate() ].join('/');
+      const b = [ e.getUTCFullYear(), e.getUTCMonth() + 1, e.getUTCDate() ].join('/');
+      return a + ' ~ ' + b;
+    }
+    return t;
+  });
+
+  const candlestickData = Object.values(groups).map((g) => {
+    return [ g[0], g[g.length - 1], Math.min(...g), Math.max(...g) ];
+  });
+
+  const header = document.createElement('header');
+  const h2 = document.createElement('h1');
+  h2.textContent = '现存确诊';
+  header.appendChild(h2);
+  const areaSelector = document.createElement('select');
+  areaSelector.addEventListener('change', () => {
+    usp.set('area', areaSelector.value);
+    location.search = usp;
+  });
+  for (let value of [
+    "北京", "天津", "上海", "重庆", "安徽", "福建", "广东", "广西", "贵州", "甘肃", "海南", "河南", "黑龙江",
+    "湖北", "湖南", "河北", "江苏", "江西", "吉林", "辽宁", "宁夏", "内蒙古", "青海", "山东", "山西", "陕西",
+    "四川", "台湾", "西藏", "新疆", "云南", "浙江", "香港", "澳门"
+  ]) {
+    const option = document.createElement('option');
+    Object.assign(option, { textContent: value, value });
+    areaSelector.appendChild(option);
+  }
+  areaSelector.value = area;
+  header.appendChild(areaSelector);
+  document.body.appendChild(header);
+
+  const mainChartContainer = document.createElement('div');
+  mainChartContainer.style.height = 400;
+  document.body.appendChild(mainChartContainer);
+  const mainChart = echarts.init(mainChartContainer);
+  mainChart.setOption({
+    xAxis: {
+      type: 'category',
+      data: timeline,
+      scale: true,
+      boundaryGap: false,
+      axisLine: {onZero: false},
+      splitLine: {show: false},
+      splitNumber: 20,
+      min: 'dataMin',
+      max: 'dataMax'
+    },
+    yAxis: { show: true },
+    tooltip: {
+      trigger: 'item',
+      formatter: ({ dataIndex: i, value }) => `
+        <div style="display: flex; justify-content: space-between;">
+          <h4 style="margin: 0;">${timeline[i].toFullString()}</h4>
+        </div>
+        <ul style="list-style: none; padding: 0; margin: 3px 0 0 0;">
+          <li>开盘：${value[1]}</li>
+          <li>收盘：${value[2]}</li>
+          <li>最低：${value[3]}</li>
+          <li>最高：${value[4]}</li>
+        </ul>
+      `
+    },
+    dataZoom: [
+      {
+        type: 'inside',
+        start: 50,
+        end: 100
+      },
+      {
+        show: true,
+        type: 'slider',
+        top: '90%',
+        start: 50,
+        end: 100
+      }
+    ],
+    series: [
+      {
+        type: 'candlestick',
+        data: candlestickData,
+        itemStyle: {
+          color: '#ec0000',
+          color0: '#00da3c',
+          borderColor: '#8A0000',
+          borderColor0: '#008F28'
+        }
+      }
+    ]
+  });
+}
+
+const script = document.createElement('script');
+script.src = url;
+document.head.appendChild(script);
+</script>

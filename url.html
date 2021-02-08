@@ -1,0 +1,283 @@
+<!doctype html>
+<meta charset="utf-8" />
+<style>
+html {
+  height: 100%;
+}
+body {
+  margin: 0;
+  height: 100%;
+}
+</style>
+<meta name="jinkela" content="auto=1" />
+<script src="//cdn.jsdelivr.net/npm/jinkela@1.3.7/umd.min.js"></script>
+<script>
+
+class Constant extends Jinkela {
+  get styleSheet() {
+    return `
+      :scope {
+        opacity: .5;
+        pointer-events: none;
+      }
+    `;
+  }
+  get template() {
+    return '<span contenteditable="false"><meta ref="children" /></span>';
+  }
+}
+
+class LineInline extends Jinkela {
+  init() {
+    const { childNodes } = this.element;
+    for (let i = 0; i < childNodes.length; i++) {
+      if (childNodes[i] instanceof Text) childNodes[i--].remove();
+    }
+  }
+  get styleSheet() {
+    return `
+      :scope {
+        display: inline;
+        &::after {
+          display: block;
+          content: '';
+        }
+      }
+    `;
+  }
+}
+
+class SearchParamsDisplayItem extends LineInline {
+  set key(v) {
+    this.keyRef.textContent = v;
+  }
+  set value(v) {
+    try {
+      const value = decodeURIComponent(v);
+      this.valueRef.dataset.type = v !== value ? 'info' : 'none';
+      this.valueRef.dataset.content = value;
+    } catch (error) {
+      this.valueRef.dataset.type = 'error';
+      this.valueRef.dataset.content = error.message;
+    }
+    this.valueRef.textContent = v;
+  }
+  set index(v) {
+    this.leading = v ? '&' : '?';
+  }
+  get styleSheet() {
+    return `
+      :scope {
+        margin-left: 1em;
+        white-space: nowrap;
+        strong {
+          margin: 0 1ch;
+        }
+        [data-type=info]::after {
+          opacity: .2;
+          content: '= ' attr(data-content);
+          position: absolute;
+          pointer-events: none;
+          margin-left: 10px;
+          white-space: nowrap;
+        }
+        [data-type=error]::after {
+          opacity: .5;
+          content: attr(data-content);
+          color: red;
+          position: absolute;
+          pointer-events: none;
+          margin-left: 10px;
+          white-space: nowrap;
+        }
+      }
+    `;
+  }
+  get template() {
+    return `
+      <li>
+        <jkl-constant>{leading}</jkl-constant>
+        <strong ref="keyRef"></strong>
+        <jkl-constant>=</jkl-constant>
+        <strong ref="valueRef"></strong>
+      </li>
+    `;
+  }
+}
+
+class SearchParamsDisplay extends LineInline {
+  get template() {
+    return `
+      <ul></ul>
+    `;
+  }
+  get styleSheet() {
+    return `
+      :scope {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+    `;
+  }
+  set value(v) {
+    const matched = /\?.*?(?=#|$)/.exec(v);
+    const { element } = this;
+    if (matched) {
+      const qs = matched[0];
+      const { list = [] } = this;
+      const iterator = qs.matchAll(/(^\?|&)([^=&]*)(?:=([^&]*))/g);
+      this.list = Array.from(iterator, ([ , , key, value ], index) => {
+        const item = list[index] || new SearchParamsDisplayItem();
+        Object.assign(item, { key, value, index });
+        if (element.childNodes[index] !== item.element) {
+          element.insertBefore(item.element, element.childNodes[index]);
+        }
+        return item;
+      });
+    } else {
+      this.list = [];
+    }
+    while (element.childNodes.length > this.list.length) element.lastChild.remove();
+  }
+}
+
+class BasicDisplay extends LineInline {
+  get styleSheet() {
+    return `
+      :scope {
+        > wtf {
+          margin-right: 1ch;
+          &:first-child {
+            margin-left: 0;
+          }
+        }
+      }
+    `;
+  }
+  get template() {
+    return `
+      <div>
+        <strong ref="protocolRef"></strong>
+        <jkl-constant if="{protocolEnd}">//</jkl-constant>
+
+        <strong if="{username}" ref="usernameRef"></strong>
+        <jkl-constant if="{username}">:</jkl-constant>
+
+        <strong if="{password}" ref="passwordRef"></strong>
+        <jkl-constant if="{password}">@</jkl-constant>
+
+        <strong if="{hostname}" ref="hostnameRef"></strong>
+        <jkl-constant if="{port}">:</jkl-constant>
+        <strong if="{port}" ref="portRef"></strong>
+        <strong ref="pathnameRef"></strong>
+      </div>
+    `;
+  }
+  set protocol(v) { this.protocolRef.textContent = v; }
+  set hostname(v) { this.hostnameRef.textContent = v; }
+  set port(v) { this.portRef.textContent = v; }
+  set pathname(v) { this.pathnameRef.textContent = v; }
+  set username(v) { this.usernameRef.textContent = v; }
+  set password(v) { this.passwordRef.textContent = v; }
+  set value(v) {
+    const matched = /^(\w*(:?))?(\/\/)(?:([^:/@?#]*):([^:/@?#]*)@)?([^:/]*)(?::(\d*))?(.*?)(?=[?#]|$)/.exec(v);
+    const [ , protocol, protocolEnd, slashes, username, password, hostname, port, pathname ] = matched || [ , v ];
+    Object.assign(this, { protocol, protocolEnd, username, password, hostname, port, pathname });
+  }
+}
+
+class HashDisplay extends LineInline {
+  get template() {
+    return `
+      <div>
+        <jkl-constant if="{hash}">#</jkl-constant>
+        <strong if="{hash}" ref="textRef"></strong>
+      </div>
+    `;
+  }
+  set value(v) {
+    const matched = /#(.*)/.exec(v);
+    if (!matched) {
+      this.hash = '';
+      this.element.style.display = 'none';
+    } else {
+      this.hash = matched[0];
+      this.textRef.textContent = matched[1];
+      this.element.style.removeProperty('display');
+    }
+  }
+  get styleSheet() {
+    return `
+      :scope {
+        margin-left: 1em;
+        strong {
+          margin: 0 1ch;
+        }
+      }
+    `;
+  }
+}
+
+class Main extends Jinkela {
+  init() {
+    this.bd = new BasicDisplay();
+    this.spd = new SearchParamsDisplay();
+    this.hd = new HashDisplay();
+  }
+  get template() {
+    return `
+      <div>
+        <div contenteditable ref="editor" on-input="{input}"></div>
+      </div>
+    `;
+  }
+  input(event) {
+    try {
+      const { editor, bd, spd, hd } = this;
+      const rawUrl = editor.textContent;
+      if (rawUrl) {
+        [ bd, spd, hd ].forEach((o, i) => {
+          if (editor.childNodes[i] !== o.element) {
+            editor.insertBefore(o.element, editor.childNodes[i]);
+          }
+          o.value = rawUrl;
+        });
+        while (editor.childNodes.length > 3) editor.lastChild.remove();
+      } else {
+        while (editor.lastChild) editor.lastChild.remove();
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  get styleSheet() {
+    return `
+      :scope {
+        height: 100%;
+        > [contenteditable] {
+          height: 100%;
+          line-height: 1.5;
+          padding: 1em;
+          outline: none;
+          font-family: monospace;
+          font-size: 14px;
+          &:empty::after {
+            font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial,
+                         sans-serif, Apple Color Emoji, Segoe UI Emoji;
+            content: 'Paste your URL here...';
+            transition: opacity 300ms ease;
+            opacity: .5;
+          }
+          &:focus:empty::after {
+            opacity: .2;
+          }
+        }
+      }
+    `;
+  }
+}
+</script>
+<body>
+  <jkl-main />
+</body>

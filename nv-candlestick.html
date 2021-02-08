@@ -47,29 +47,6 @@ const buildGroups = (values, categories) => {
 };
 
 function callback(res) {
-  const [ { trend } ] = res.data;
-  const { 确诊, 治愈, 死亡 } = Object.fromEntries(trend.list.map(i => [ i.name, i.data ]));
-  const { updateDate } = trend;
-
-  const values = 确诊.map((v, i) => v - 治愈[i] - 死亡[i]);
-  const groups = buildGroups(values, updateDate);
-  const timeline = Object.keys(groups).map(v => {
-    v *= 1;
-    const t = new Date(START + v * 864E5 * 7);
-    const e = new Date(START + (v + 1) * 864E5 * 7 - 1);
-    t.toString = () => t.getUTCMonth() + 1 + '/' + t.getUTCDate();
-    t.toFullString = () => {
-      const a = [ t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate() ].join('/');
-      const b = [ e.getUTCFullYear(), e.getUTCMonth() + 1, e.getUTCDate() ].join('/');
-      return a + ' ~ ' + b;
-    }
-    return t;
-  });
-
-  const candlestickData = Object.values(groups).map((g) => {
-    return [ g[0], g[g.length - 1], Math.min(...g), Math.max(...g) ];
-  });
-
   const header = document.createElement('header');
   const h2 = document.createElement('h1');
   h2.textContent = '现存确诊';
@@ -93,6 +70,40 @@ function callback(res) {
   areaSelector.value = area;
   header.appendChild(areaSelector);
   document.body.appendChild(header);
+
+  if (res.status) {
+    const strong = document.createElement('strong');
+    strong.style.whiteSpace = 'pre';
+    strong.style.color = 'red';
+    strong.style.marginLeft = '1em';
+    strong.style.fontFamily = 'monospace';
+    strong.textContent = JSON.stringify(res, null, 2);
+    document.body.appendChild(strong);
+    return;
+  }
+
+  const [ { trend } ] = res.data;
+  const { 确诊, 治愈, 死亡 } = Object.fromEntries(trend.list.map(i => [ i.name, i.data ]));
+  const { updateDate } = trend;
+
+  const values = 确诊.map((v, i) => v - 治愈[i] - 死亡[i]);
+  const groups = buildGroups(values, updateDate);
+  const timeline = Object.keys(groups).map(v => {
+    v *= 1;
+    const t = new Date(START + v * 864E5 * 7);
+    const e = new Date(START + (v + 1) * 864E5 * 7 - 1);
+    t.toString = () => t.getUTCMonth() + 1 + '/' + t.getUTCDate();
+    t.toFullString = () => {
+      const a = [ t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate() ].join('/');
+      const b = [ e.getUTCFullYear(), e.getUTCMonth() + 1, e.getUTCDate() ].join('/');
+      return a + ' ~ ' + b;
+    }
+    return t;
+  });
+
+  const candlestickData = Object.values(groups).map((g) => {
+    return [ g[0], g[g.length - 1], Math.min(...g), Math.max(...g) ];
+  });
 
   const mainChartContainer = document.createElement('div');
   mainChartContainer.style.height = 400;

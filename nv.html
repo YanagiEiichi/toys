@@ -7,11 +7,9 @@ body > div {
 header {
   display: flex;
   align-items: center;
-  position: absolute;
   z-index: 1;
-  left: 4em;
-  top: 100;
   opacity: .8;
+  padding-left: 1em;
 }
 header > * {
   margin-right: 1em;
@@ -53,33 +51,11 @@ const createEma = (N, values) => {
 const colorMap = { EMA14: '#f1913e', EMA30: '#49aee1', EMA60: '#da7ad6' };
 
 function callback(res) {
-  const [ { trend } ] = res.data;
-  const values = trend.list.find(i => i.name === '新增确诊').data;
-  const { updateDate } = trend;
-  const timeline = trend.updateDate.map(i => i.replace('.', '/'));
-
-  const mainChartContainer = document.createElement('div');
-  mainChartContainer.style.height = 400;
-  document.body.appendChild(mainChartContainer);
-  const mainChart = echarts.init(mainChartContainer);
-  const dataMap = { EMA14: createEma(14, values), EMA30: createEma(30, values), EMA60: createEma(60, values) };
-
-  const macdChartContainer = document.createElement('div');
-  macdChartContainer.style.height = 200;
-  document.body.appendChild(macdChartContainer);
-  const macdChart = echarts.init(macdChartContainer);
-  const ema12 = createEma(12, values);
-  const ema26 = createEma(26, values);
-  const dif = values.map((_, i) => ema12[i] - ema26[i]);
-  const dea = createEma(9, dif);
-  const macd = values.map((_, i) => (dif[i] - dea[i]) * 2);
 
   const header = document.createElement('header');
-
-  const h2 = document.createElement('strong');
-  h2.textContent = '新增确诊';
-  header.appendChild(h2);
-
+  const h1 = document.createElement('h1');
+  h1.textContent = '新增确诊';
+  header.appendChild(h1);
   const areaSelector = document.createElement('select');
   areaSelector.addEventListener('change', () => {
     usp.set('area', areaSelector.value);
@@ -95,6 +71,39 @@ function callback(res) {
   areaSelector.value = area;
   header.appendChild(areaSelector);
   document.body.appendChild(header);
+
+  if (res.status) {
+    const strong = document.createElement('strong');
+    strong.style.whiteSpace = 'pre';
+    strong.style.color = 'red';
+    strong.style.marginLeft = '1em';
+    strong.style.fontFamily = 'monospace';
+    strong.textContent = JSON.stringify(res, null, 2);
+    document.body.appendChild(strong);
+    return;
+  }
+
+  const [ { trend } ] = res.data;
+  const values = trend.list.find(i => i.name === '新增确诊').data;
+  const { updateDate } = trend;
+  const timeline = trend.updateDate.map(i => i.replace('.', '/'));
+
+  const mainChartContainer = document.createElement('div');
+  mainChartContainer.style.height = 400;
+  mainChartContainer.style.marginTop = -80;
+  document.body.appendChild(mainChartContainer);
+  const mainChart = echarts.init(mainChartContainer);
+  const dataMap = { EMA14: createEma(14, values), EMA30: createEma(30, values), EMA60: createEma(60, values) };
+
+  const macdChartContainer = document.createElement('div');
+  macdChartContainer.style.height = 200;
+  document.body.appendChild(macdChartContainer);
+  const macdChart = echarts.init(macdChartContainer);
+  const ema12 = createEma(12, values);
+  const ema26 = createEma(26, values);
+  const dif = values.map((_, i) => ema12[i] - ema26[i]);
+  const dea = createEma(9, dif);
+  const macd = values.map((_, i) => (dif[i] - dea[i]) * 2);
 
   const renderCharts = (start) => {
     const xTimeline = timeline.slice(start);

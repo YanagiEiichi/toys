@@ -1,9 +1,7 @@
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <link href="a4.css" rel="stylesheet" />
 <style>
-body > div {
-  margin: -2em;
-}
 header {
   display: flex;
   align-items: center;
@@ -162,6 +160,10 @@ function callback(res) {
         }
       }
     ]
+  });
+
+  addEventListener('resize', () => {
+     mainChart.resize();
   });
 }
 

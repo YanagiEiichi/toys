@@ -1,9 +1,7 @@
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <link href="a4.css" rel="stylesheet" />
 <style>
-body > div {
-  margin: -2em;
-}
 header {
   display: flex;
   align-items: center;
@@ -105,10 +103,12 @@ function callback(res) {
   const dea = createEma(9, dif);
   const macd = values.map((_, i) => (dif[i] - dea[i]) * 2);
 
-  const renderCharts = (start) => {
+  const renderCharts = () => {
+    const start = timeRangeSelector.value;
     const xTimeline = timeline.slice(start);
     const xValues = values.slice(start);
     const lines = Object.keys(dataMap);
+    mainChart.resize();
     mainChart.setOption({
       xAxis: { data: xTimeline },
       yAxis: { show: false },
@@ -131,6 +131,7 @@ function callback(res) {
         ...lines.map(i => new ChartLine(i, dataMap[i].slice(start), colorMap[i]))
       ]
     });
+    macdChart.resize();
     macdChart.setOption({
       xAxis: { data: xTimeline },
       yAxis: { show: false },
@@ -148,8 +149,7 @@ function callback(res) {
   };
 
   const timeRangeSelector = document.createElement('select');
-  const timeRangeSelectorHandler = () => renderCharts(timeRangeSelector.value);
-  timeRangeSelector.addEventListener('change', timeRangeSelectorHandler);
+  timeRangeSelector.addEventListener('change', renderCharts);
   for (let [ textContent, value ] of [
     [ '近 12 月', -365 ],
     [ '近 6 月', -183 ],
@@ -162,7 +162,9 @@ function callback(res) {
   }
   header.appendChild(timeRangeSelector);
 
-  timeRangeSelectorHandler();
+  addEventListener('resize', renderCharts);
+
+  renderCharts();
 }
 
 const script = document.createElement('script');

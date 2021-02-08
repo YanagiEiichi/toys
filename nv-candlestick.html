@@ -79,11 +79,13 @@ function callback(res) {
     usp.set('area', areaSelector.value);
     location.search = usp;
   });
-  for (let value of [
+  const areaList = [
     "北京", "天津", "上海", "重庆", "安徽", "福建", "广东", "广西", "贵州", "甘肃", "海南", "河南", "黑龙江",
     "湖北", "湖南", "河北", "江苏", "江西", "吉林", "辽宁", "宁夏", "内蒙古", "青海", "山东", "山西", "陕西",
     "四川", "台湾", "西藏", "新疆", "云南", "浙江", "香港", "澳门"
-  ]) {
+  ];
+  if (!areaList.includes(area)) areaList.unshift(area);
+  for (let value of areaList) {
     const option = document.createElement('option');
     Object.assign(option, { textContent: value, value });
     areaSelector.appendChild(option);
